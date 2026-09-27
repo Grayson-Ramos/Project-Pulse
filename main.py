@@ -17,15 +17,40 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
+import streamlit as st
+from supabase import create_client, Client
 
-from data import (
-    PROGRAMS,
-    INTAKE_YEARS,
-    COHORT_LABELS,
-    generate_student_data,
-    generate_sync_log,
-    default_field_mapping,
-    default_permissions,
+# 1. Initialize the connection
+@st.cache_resource
+def init_connection() -> Client:
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+supabase = init_connection()
+
+# 2. Fetch data (Cached to prevent hitting the DB on every button click)
+@st.cache_data(ttl=600) # Caches results for 10 minutes
+def get_enrollments():
+    # Because you set up Foreign Keys, you can select (*) from enrollments 
+    # and nest the linked records from students, programs, and advisers.
+    response = supabase.table("enrollments").select(
+        "*, students(*), programs(*), advisers(*)"
+    ).execute()
+    
+    return response.data
+
+# 3. Display in Streamlit
+st.title("OBE Pilot Database")
+
+data = get_enrollments()
+
+if data:
+    st.dataframe(data)
+else:
+    st.warning("No data found or connection failed.")
+
+
 )
 
 # ---------------------------------------------------------------------------
